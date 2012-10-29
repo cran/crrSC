@@ -93,18 +93,21 @@ scores and var at \code{init}, but performs no iterations)
 \item{$loglik.null}{The value of the log pseudo-likelihood when all the
   coefficients are 0}
 }
-\details{Fits the stratified extension of the Fine and Gray model (2010).  
+\details{Fits the stratified extension of the Fine and Gray model (2011).  
 This model directly assesses the effect of covariates on the subdistribution 
 of a particular type of failure in a competing risks setting.  
 }
 
-\references{Zhou, Latouche, Rocha, and Fine. Competing Risks Regression for Stratified Data. Biometrics 2010.}
+\references{
+Zhou B, Latouche A, Rocha V, Fine J. (2011)  Competing Risks Regression for Stratified Data.
+Biometrics, 67(2):661-70.
+}
 
 \seealso{cmprsk}
 \author{Bingqing Zhou, \email{bingqing.zhou@yale.edu}}
 \examples{
-#
-#### using fine and gray model
+##
+#using fine and gray model
 #crr(ftime=center$ftime, fstatus=center$fstatus, 
 #cov1=cbind(center$fm,center$cells))
 #

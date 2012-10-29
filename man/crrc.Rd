@@ -103,8 +103,10 @@ failure in a competing risks setting.
 
 
 }
-\references{Zhou, Fine, Latouche, Labopin. Competing Risks Regression for Clustered data. Under Review        
-                   
+\references{   
+Zhou B, Fine J,  Latouche A, Labopin M. (2011)  Competing Risks Regression for Clustered data. 
+In Press.  Biostatistics. 
+                
 }
 \seealso{cmprsk
 

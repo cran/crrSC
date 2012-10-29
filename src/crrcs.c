@@ -14,7 +14,7 @@ void crrvvh(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, int
       double *ft, int *ndfin, int *strata, int *nstrata, double *wt, double *b, double *v, double *v2)
 {
     const int n1=ncov[0], n2=ncov2[0], n=nin[0], ndf=ndfin[0], np=n1+n2, ns=nstrata[0];
-	int i,j, k, j1, j2, s, count=0, count1=0, count2=0, pi[n];
+	int i,j, k, j1, j2, s, count=0, count2=0, pi[n];
     double a[n][n1],aa[n][n2],tt[ndf][n2], z[np],zb, wye, wyez[np], ss0[n], ss1[n][np], ss2[n][np][np],
 		eta[n][np], vt[np][np], q[n][np], xi[ns][np];
 
