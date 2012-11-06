@@ -99,8 +99,8 @@ of a particular type of failure in a competing risks setting.
 }
 
 \references{
-Zhou B, Latouche A, Rocha V, Fine J. (2011)  Competing Risks Regression for Stratified Data.
-Biometrics, 67(2):661-70.
+Zhou B, Latouche A, Rocha V, Fine J. (2011). Competing Risks Regression for Stratified Data.
+Biometrics. 67(2):661-70.
 }
 
 \seealso{cmprsk}
