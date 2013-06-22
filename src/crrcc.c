@@ -4,9 +4,12 @@
 
 // author: Bingqing Zhou
 // Date:   12/21/2008
+// modified on 5/19/2013
 
 #include <R.h>
 #include <math.h>
+#include <stdlib.h>
+#define LEN sizeof(double)
 
 // similar to crrf to obtain liklihood
 
@@ -15,21 +18,25 @@ void crrfoo(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, i
 {
     int i,j, k, j1,  count=0;
 	const int n1=ncov[0], n2=ncov2[0], n=nin[0], ndf=ndfin[0];
-	double a[n][n1], aa[n][n2], tt[ndf][n2], likli=0, s0,zb;
+	double likli=0, s0,zb,*a,*aa,*tt;
+
+	a=(double*)malloc(n*n1*LEN);
+	aa=(double*)malloc(n*n2*LEN);
+	tt=(double*)malloc(ndf*n2*LEN);
 	
 	if (n1 > 0)
         for (i = 0; i < n; i++)
             for (j = 0; j < n1; j++)
-                a[i][j]= x[i + n * j];
+                *(a+i*n1+j)= x[i + n * j];
 
     if (n2 > 0)
         for (i = 0; i < n; i++)
             for (j = 0; j < n2; j++)
-                aa[i][j]= x2[i + n * j];
+                *(aa+i*n2+j)= x2[i + n * j];
     if (n2 > 0)
         for (i = 0; i < ndf; i++)
             for (j = 0; j < n2; j++)
-                tt[i][j]= ft[i + ndf * j];
+                *(tt+i*n2+j)= ft[i + ndf * j];
 
     for (i = 0; i < n; i++)
 	{
@@ -38,10 +45,10 @@ void crrfoo(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, i
 		//first part of logliklihood
 		if (n1 > 0)
 			for (j = 0; j < n1; j++)
-				likli += b[j] * a[i][j];
+				likli += b[j] *  (*(a+i*n1+j)) ;
 		if (n2 > 0)
 			for (k = 0; k < n2; k++)
-				likli += b[n1+k] * aa[i][k] * tt[count][k];
+				likli += b[n1+k] * (*(aa+i*n2+k))* (*(tt+count*n2+k));
         //second part of logliklihood
 		s0=0;
 		for (j = 0; j < n; j++)
@@ -50,10 +57,10 @@ void crrfoo(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, i
 			zb = 0.0;
 			if (n1 > 0)
 				for (j1 = 0; j1 < n1; j1 ++)
-					zb += b[j1] * a[j][j1];
+					zb += b[j1] * (*(a+j*n1+j1));
 			if (n2 > 0)
 				for (k = 0; k < n2; k++)
-					zb += b[n1+k] * aa[j][k] * tt[count][k];
+					zb += b[n1+k] * (*(aa+j*n2+k)) * (*(tt+count*n2+k));
 
 			if (t2[j] >= t2[i]) 
 				s0 += exp(zb);
@@ -70,6 +77,7 @@ void crrfoo(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, i
    
 	*lik=likli;
 
+	free(a);free(aa);free(tt);
 }
 
 
@@ -80,28 +88,34 @@ void crrfsvoo(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2,
 {
     int i,j, k, j1,  count=0;
 	const int n1=ncov[0], n2=ncov2[0], n=nin[0], ndf=ndfin[0], np=n1+n2;
-	double a[n][n1],aa[n][n2],tt[ndf][n2],likli=0,s0,s1[np],s2[np][np],z[np],zb,wye,vt[np][np];
+	double likli=0,s0,s1[np],z[np],zb,wye,*a,*aa,*tt,*s2,*vt;
+
+	a=(double*)malloc(n*n1*LEN);
+	aa=(double*)malloc(n*n2*LEN);
+	tt=(double*)malloc(ndf*n2*LEN);
+	s2=(double*)malloc(np*np*LEN);
+	vt=(double*)malloc(np*np*LEN);
 
     for (i = 0; i < np; i++)
 	{
 		st[i] = 0;
 		for (j = 0; j < np; j++)
-			vt[i][j]= 0;
+			*(vt+i*np+j)= 0;
 	}
 
 	if (n1 > 0)
 		for (i = 0; i < n; i++)
 			for (j = 0; j < n1; j++)
-				a[i][j]= x[i + n * j];
+				*(a+i*n1+j)= x[i + n * j];
 
     if (n2 > 0)
 		for (i = 0; i < n; i++)
 		    for (j = 0; j < n2; j++)
-			    aa[i][j]= x2[i + n * j];
+			    *(aa+i*n2+j)= x2[i + n * j];
     if (n2 > 0)
 		for (i = 0; i < ndf; i++)
 		    for (j = 0; j < n2; j++)   
-		     	tt[i][j]= ft[i + ndf * j];
+		     	*(tt+i*n2+j)= ft[i + ndf * j];
 
 
     for (i = 0; i < n; i++)
@@ -113,14 +127,14 @@ void crrfsvoo(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2,
 		if (n1 > 0)
 			for (j = 0; j < n1; j++)
 			{
-				st[j]  +=  a[i][j];
-				zb += b[j] * a[i][j];
+				st[j]  +=  *(a+i*n1+j);
+				zb += b[j] * (*(a+i*n1+j));
 			}
 		if (n2 > 0)
 			for (k = 0; k < n2; k++)
 			{
-				st[n1+k]  +=  aa[i][k] * tt[count][k];
-				zb += b[n1+k] * aa[i][k] * tt[count][k];
+				st[n1+k]  +=  (*(aa+i*n2+k))* (*(tt+count*n2+k));
+				zb += b[n1+k] * (*(aa+i*n2+k)) * (*(tt+count*n2+k));
 			}
 
         likli += zb;
@@ -131,7 +145,7 @@ void crrfsvoo(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2,
 		{
 			s1[k] = 0;
 			for (j1 = 0; j1 < np; j1 ++)
-				s2[k][j1] = 0;
+				*(s2+k*np+j1)= 0;
 		}
 
 		for (j = 0; j < n; j++)
@@ -145,15 +159,15 @@ void crrfsvoo(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2,
 			if (n1 > 0)
 				for (j1 = 0; j1 < n1; j1 ++)
 				{
-					z[j1] = a[j][j1];
-					zb += b[j1] * a[j][j1];
+					z[j1] = *(a+j*n1+j1);
+					zb += b[j1] * (*(a+j*n1+j1));
 				}
 				    
 			if (n2 > 0)
 				for (k = 0; k < n2; k++)
 				{
-					z[n1+k] = aa[j][k] * tt[count][k];
-					zb += b[n1+k] * aa[j][k] * tt[count][k];
+					z[n1+k] =  (*(aa+j*n2+k)) * (*(tt+count*n2+k));
+					zb += b[n1+k] *  (*(aa+j*n2+k)) * (*(tt+count*n2+k));
 				}
 
 
@@ -167,7 +181,7 @@ void crrfsvoo(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2,
 			{
 				s1[k] += wye * z[k];
 				for (j1 = 0; j1 < np; j1++)
-					s2[k][j1] += wye * z[k] * z[j1];
+					*(s2+k*np+j1) += wye * z[k] * z[j1];
 			}
 
 		}
@@ -178,7 +192,7 @@ void crrfsvoo(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2,
 		{
 			st[k] -= s1[k] / s0;
 			for (j1 = 0; j1 < np; j1++)
-				vt[k][j1] += s2[k][j1]/s0 - s1[k] * s1[j1]/s0/s0;
+				*(vt+k*np+j1) += (*(s2+k*np+j1))/s0 - s1[k] * s1[j1]/s0/s0;
 		}
 		
 	    count++;
@@ -188,8 +202,10 @@ void crrfsvoo(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2,
 
     for (i = 0; i < np; i++)
 		for (j = 0; j < np; j++)
-			v[i + np * j] = vt[i][j];
+			v[i + np * j] = *(vt+i*np+j);
 
+
+	free(a);free(aa);free(tt);free(s2);free(vt);
 }
 
 
@@ -204,30 +220,41 @@ void crrvvoo(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, in
 {
     const int n1=ncov[0], n2=ncov2[0], n=nin[0], ndf=nfin[0], np=n1+n2, nc=*ncin;
 	int i,j, k, j1, j2,count=0, count1=0, count2=0, pi[n];
-    double a[n][n1],aa[n][n2],tt[ndf][n2], z[np],zb, wye, wyez[np], ss0[n], ss1[n][np], ss2[n][np][np],
-		eta[n][np], vt[np][np], q[n][np], xi[nc][np];
+    double z[np],zb, wye, wyez[np], ss0[n],*a,*aa,*tt,*ss1,*ss2,*eta,*q,*vt,*xi;
+
+
+	a=(double*)malloc(n*n1*LEN);
+	aa=(double*)malloc(n*n2*LEN);
+	tt=(double*)malloc(ndf*n2*LEN);
+	ss1=(double*)malloc(n*np*LEN);
+	ss2=(double*)malloc(n*np*np*LEN);
+	eta=(double*)malloc(n*np*LEN);
+	q=(double*)malloc(n*np*LEN);
+	vt=(double*)malloc(np*np*LEN);
+	xi=(double*)malloc(nc*np*LEN);
+
 
 	//relates the matrices with the vector parameters
 	if (n1 > 0)
         for (i = 0; i < n; i++)
             for (j = 0; j < n1; j++)
-                a[i][j]= x[i + n * j];
+                *(a+i*n1+j)= x[i + n * j];
 
     if (n2 > 0)
         for (i = 0; i < n; i++)
             for (j = 0; j < n2; j++)
-                aa[i][j]= x2[i + n * j];
+                *(aa+i*n2+j)= x2[i + n * j];
     if (n2 > 0)
         for (i = 0; i < ndf; i++)
             for (j = 0; j < n2; j++)
-                tt[i][j]= ft[i + ndf * j];
+                *(tt+i*n2+j)= ft[i + ndf * j];
 
     // initialization
 	for (i = 0; i < n; i++)
 	{
 		pi[i] = 0;
 		for (j = 0; j < np; j++)
-			eta[i][j] = q[i][j] = 0;
+			*(eta+i*np+j) = *(q+i*np+j) = 0;
 	}
 
 	for (i = 0; i < n; i++)
@@ -235,19 +262,19 @@ void crrvvoo(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, in
         ss0[i] = 0;
         for (j = 0; j < np; j++)
         {
-            ss1[i][j]= 0;
+            *(ss1+i*np+j)= 0;
             for (k = 0; k < np; k++)
-                ss2[i][j][k] = 0;
+                *(ss2+i*np*np+j*np+k) = 0;
         }
     }
 
 	for (i = 0; i < np; i++)
         for (j = 0; j < np; j++)
-			vt[i][j] = 0;
+			*(vt+i*np+j) = 0;
 
 	for (i = 0; i < nc; i++)
         for (j = 0; j < np; j++)
-			xi[i][j] = 0;
+			*(xi+i*np+j) = 0;
 
 
     // obtain s(0)(beta,t),s(1)(beta,t), and s(2)(beta,t) at all type 1 failure times
@@ -266,15 +293,15 @@ void crrvvoo(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, in
             if (n1 > 0)
                 for (j1 = 0; j1 < n1; j1 ++)
                 {
-                    z[j1] = a[j][j1];
-                    zb += b[j1] * a[j][j1];
+                    z[j1] = *(a+j*n1+j1);
+                    zb += b[j1] * (*(a+j*n1+j1));
                 }
 
             if (n2 > 0)
                 for (k = 0; k < n2; k++)
                 {
-                    z[n1+k] = aa[j][k] * tt[count][k];
-                    zb += b[n1+k] * aa[j][k] * tt[count][k];
+                    z[n1+k] = (*(aa+j*n2+k)) * (*(tt+count*n2+k));
+                    zb += b[n1+k] * (*(aa+j*n2+k)) * (*(tt+count*n2+k));
                 }
 
             if (t2[j] >= t2[i])
@@ -285,9 +312,9 @@ void crrvvoo(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, in
             ss0[i] += wye;
             for (k = 0; k < np; k++)
             {
-                ss1[i][k] += wye * z[k];
+                *(ss1+i*np+k) += wye * z[k];
                 for (j1 = 0; j1 < np; j1++)
-                    ss2[i][k][j1] += wye * z[k] * z[j1];
+                    *(ss2+i*np*np+k*np+j1) += wye * z[k] * z[j1];
             }
         }
         count++;
@@ -300,7 +327,7 @@ void crrvvoo(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, in
     for (i = 0; i < n; i++)
     {
         for (k = 0; k < np; k++)
-            eta[i][k] = 0;
+            *(eta+i*np+k) = 0;
 
 		count1 = 0;
         //dLamda portion of eta_i
@@ -315,15 +342,15 @@ void crrvvoo(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, in
             if (n1 > 0)
                 for (j1 = 0; j1 < n1; j1 ++)
                 {
-                    z[j1] = a[i][j1];
-                    zb += b[j1] * a[i][j1];
+                    z[j1] = *(a+i*n1+j1);
+                    zb += b[j1] * (*(a+i*n1+j1));
                 }
 
             if (n2 > 0)
                 for (k = 0; k < n2; k++)
                 {
-                    z[n1+k] = aa[i][k] * tt[count1][k];
-                    zb += b[n1+k] * aa[i][k] * tt[count1][k];
+                    z[n1+k] = (*(aa+i*n2+k))*(*(tt+count1*n2+k));
+                    zb += b[n1+k] * (*(aa+i*n2+k))*(*(tt+count1*n2+k));
                 }
 
 
@@ -334,7 +361,7 @@ void crrvvoo(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, in
             else continue;
 
             for (k = 0; k < np; k++)
-                eta[i][k] -= (z[k] - ss1[j][k]/ss0[j]) * wye / ss0[j];
+                *(eta+i*np+k) -= (z[k] - (*(ss1+j*np+k))/ss0[j]) * wye / ss0[j];
 
             count1 ++;
         }
@@ -348,23 +375,23 @@ void crrvvoo(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, in
 			if (n1 > 0)
 				for (j = 0; j < n1; j++)
 				{
-					z[j] = a[i][j];
-					zb += b[j] * a[i][j];
+					z[j] = *(a+i*n1+j);
+					zb += b[j] * (*(a+i*n1+j));
 				}
 			if (n2 > 0)
 				for (k = 0; k < n2; k++)
 				{
-					z[n1+k]= aa[i][k] * tt[count][k];
-					zb += b[n1+k] * aa[i][k] * tt[count][k];
+					z[n1+k]= (*(aa+i*n2+k))*(*(tt+count*n2+k));
+					zb += b[n1+k] * (*(aa+i*n2+k))*(*(tt+count*n2+k));
 				}
 
 			for (k = 0; k < np; k++)
-				eta[i][k] += z[k] - ss1[i][k]/ss0[i];
+				*(eta+i*np+k) += z[k] - (*(ss1+i*np+k))/ss0[i];
 
 			//information
 			for (j = 0; j < np; j++)
 				for (k = 0; k < np; k++)
-					vt[j][k] += ss2[i][j][k]/ss0[i] - ss1[i][j] * ss1[i][k]/ss0[i]/ss0[i];
+					*(vt+j*np+k) += (*(ss2+i*np*np+j*np+k))/ss0[i] - *(ss1+i*np+j) * (*(ss1+i*np+k))/ss0[i]/ss0[i];
 
 			count++;
 		}
@@ -398,14 +425,14 @@ void crrvvoo(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, in
 					if (n1 > 0)
 						for (j = 0; j < n1; j++)
 						{
-							z[j] = a[j2][j];
-							zb += b[j] * a[j2][j];
+							z[j] = *(a+j2*n1+j);
+							zb += b[j] *(*(a+j2*n1+j));
 						}
 					if (n2 > 0)
 						for (k = 0; k < n2; k++)
 						{
-							z[n1+k]= aa[j2][k] * tt[count2-1][k];
-							zb += b[n1+k] * aa[j2][k] * tt[count2-1][k];
+							z[n1+k]= (*(aa+j2*n2+k)) * (*(tt+(count2-1)*n2+k));
+							zb += b[n1+k] * (*(aa+j2*n2+k)) * (*(tt+(count2-1)*n2+k));
 						}
 
 					wye += exp(zb)* wt[j1] / wt[j2];
@@ -414,7 +441,7 @@ void crrvvoo(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, in
 				}
 
 				for (k = 0; k < np; k++)
-					q[i][k] += (wyez[k] - ss1[j1][k]/ss0[j1] * wye) /ss0[j1];
+					*(q+i*np+k) += (wyez[k] - (*(ss1+j1*np+k))/ss0[j1] * wye) /ss0[j1];
 			}
 		}  
 	}
@@ -424,18 +451,18 @@ void crrvvoo(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, in
 	for (i = 0; i < n; i++)
         for (k = 0; k < np; k++)
 		{
-			if (ici[i]==0) eta[i][k] += q[i][k]/pi[i];
+			if (ici[i]==0) *(eta+i*np+k) += (*(q+i*np+k))/pi[i];
 		    for (j = 0; j < n; j++)
 			{
 				    if (t2[j] > t2[i]) break;
-				    if (ici[j] == 0) eta[i][k] -= q[j][k]/pi[j]/pi[j];
+				    if (ici[j] == 0)  *(eta+i*np+k) -= (*(q+j*np+k))/pi[j]/pi[j];
 			 }
 		}
 
 
     for (j = 0; j < np; j++)
         for (k= 0; k < np; k++)
-            v[j  + k * np] = vt[j][k] ;   
+            v[j  + k * np] = *(vt+j*np+k) ;   
 
 	for (i=0; i< np*np; i++)
 		v2[i]=0;
@@ -445,7 +472,7 @@ void crrvvoo(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, in
 		for (j = 0; j < np; j++)
 			for (k= 0; k < np; k++)
 				for (i = 0; i < n; i++)
-					v2[j  + k * np] += eta[i][j] * eta[i][k];
+					v2[j  + k * np] += (*(eta+i*np+j)) * (*(eta+i*np+k));
 	}
 	else
 	{
@@ -454,13 +481,15 @@ void crrvvoo(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, in
 			{
 				if (cluster[j] != i+1) continue;
 				for (k = 0; k < np; k++)
-					xi[i][k] += eta[j][k];
+					*(xi+i*np+k) += *(eta+j*np+k);
 			}
 
 		for (j = 0; j < np; j++)
 			for (k= 0; k < np; k++)
 				for (i = 0; i < nc; i++)
-					v2[j  + k * np] += xi[i][j] * xi[i][k];
+					v2[j  + k * np] += (*(xi+i*np+j)) * (*(xi+i*np+k));
 	}
 
+
+	free(a);free(aa);free(tt);free(vt);free(ss1);free(ss2);free(eta);free(q);free(xi);
 }

@@ -1,10 +1,8 @@
-# Default NAMESPACE created by R
-# Remove the previous line if you edit this file
+useDynLib(crrSC)
+export("crrs","crrc","psh.test")
 
-# Export all names
-exportPattern(".")
-
-# Import all packages listed as Imports or Depends
 import(
   survival
 )
+S3method(print,crrs)
+

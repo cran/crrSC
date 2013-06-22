@@ -4,257 +4,25 @@
 
 // author: Bingqing Zhou
 // Date:   12/21/2008
-// Modified: 06/02/2013
+// updated: 6/1/2013
 
 #include <R.h>
 #include <math.h>
 #include <stdlib.h>
 #define LEN sizeof(double)
-// obtain the variance for highly stratified data
-
-void crrvvh(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, int *ncov2,
-      double *ft, int *ndfin, int *strata, int *nstrata, double *wt, double *b, double *v, double *v2)
-{
-    const int n1=ncov[0], n2=ncov2[0], n=nin[0], ndf=ndfin[0], np=n1+n2, ns=nstrata[0];
-	int i,j, k, j1, j2, s, count=0, count1=0, count2=0, pi[n];
-    double z[np],zb, wye, wyez[np], ss0[n],*a,*aa,*tt,*ss1,*ss2,*eta,*q,*vt,*xi;
-	a=(double*)malloc(n*n1*LEN);
-	aa=(double*)malloc(n*n2*LEN);
-	tt=(double*)malloc(ndf*n2*LEN);
-	ss1=(double*)malloc(n*np*LEN);
-	ss2=(double*)malloc(n*np*np*LEN);
-	eta=(double*)malloc(n*np*LEN);
-	q=(double*)malloc(n*np*LEN);
-	vt=(double*)malloc(np*np*LEN);
-	xi=(double*)malloc(ns*np*LEN);
-
-	//relates the matrices to the vector parameters
-    if (n1 > 0)
-        for (i = 0; i < n; i++)
-            for (j = 0; j < n1; j++)
-                *(a+i*n1+j)= x[i + n * j];
-
-    if (n2 > 0)
-        for (i = 0; i < n; i++)
-            for (j = 0; j < n2; j++)
-                *(aa+i*n2+j)= x2[i + n * j];
-    if (n2 > 0)
-        for (i = 0; i < ndf; i++)
-            for (j = 0; j < n2; j++)
-                *(tt+i*n2+j)= ft[i + ndf * j];
-
-    // initialization
-	for (i = 0; i < n; i++)
-	{
-		pi[i] = 0;
-		for (j = 0; j < np; j++)
-			*(eta+i*np+j) = *(q+i*np+j) = 0;
-	}
-
-	for (i = 0; i < n; i++)
-    {
-        ss0[i] = 0;
-        for (j = 0; j < np; j++)
-        {
-            *(ss1+i*np+j)= 0;
-            for (k = 0; k < np; k++)
-                *(ss2+i*np*np+j*np+k) = 0;
-        }
-    }
-
-	for (i = 0; i < np; i++)
-        for (j = 0; j < np; j++)
-			*(vt+i*np+j) = 0;
-
-	for (i = 0; i < ns; i++)
-        for (j = 0; j < np; j++)
-			*(xi+i*np+j) = 0;
-
-    // obtain s(0)(beta,t),s(1)(beta,t), and s(2)(beta,t) at all type 1 failure times
-    for (i = 0; i < n; i++)
-    {
-        if (ici[i] != 1) continue;
-		s = strata[i];
-
-        for (j = 0; j < n; j++)
-        {
-            if (strata[j] != s) continue;
-			if (t2[j] < t2[i] && ici[j] <= 1) continue;
-            //put covariates for jth obsertation at Ti in a vector z, and beta'z=zb
-            zb = 0;
-            for (k = 0; k < np; k++)
-                z[k] = 0;
-
-            if (n1 > 0)
-                for (j1 = 0; j1 < n1; j1 ++)
-                {
-                    z[j1] = *(a+j*n1+j1);
-                    zb += b[j1] * (*(a+j*n1+j1));
-                }
-
-            if (n2 > 0)
-                for (k = 0; k < n2; k++)
-                {
-                    z[n1+k] = (*(aa+j*n2+k)) * (*(tt+count*n2+k));
-                    zb += b[n1+k] * (*(aa+j*n2+k)) * (*(tt+count*n2+k));
-                }
-
-            if (t2[j] >= t2[i])
-                wye = exp(zb);
-            else
-                wye = exp(zb) * wt[i] / wt[j];
-
-            ss0[i] += wye;
-            for (k = 0; k < np; k++)
-            {
-                *(ss1+i*np+k) += wye * z[k];
-                for (j1 = 0; j1 < np; j1++)
-                    *(ss2+i*np*np+k*np+j1) += wye * z[k] * z[j1];
-            }
-        }
-        count++;
-    }
-
-  ///////////////////////////////////////////////////////////////
-  
-    // eta_i and infomation
-	count = 0;
-    for (i = 0; i < n; i++)
-    {
-        for (k = 0; k < np; k++)
-            *(eta+i*np+k) = 0;
-
-        //dN_i portion of eta_i
-        if (ici[i] == 1) 
-		{
-			zb = 0;
-			for (k = 0; k < np; k++)
-				z[k] = 0;
-			if (n1 > 0)
-				for (j = 0; j < n1; j++)
-				{
-					z[j] = *(a+i*n1+j);
-					zb += b[j] * (*(a+i*n1+j));
-				}
-			if (n2 > 0)
-				for (k = 0; k < n2; k++)
-				{
-					z[n1+k]= (*(aa+i*n2+k))* (*(tt+count*n2+k));
-					zb += b[n1+k] * (*(aa+i*n2+k))* (*(tt+count*n2+k));
-				}
-      
-			for (k = 0; k < np; k++)
-				*(eta+i*np+k)= z[k] - (*(ss1+i*np+k))/ss0[i];
-
-			//information
-			for (j = 0; j < np; j++)
-				for (k = 0; k < np; k++)
-					*(vt+j*np+k)+= (*(ss2+i*np*np+j*np+k))/ss0[i] - (*(ss1+i*np+j))* (*(ss1+i*np+k))/ss0[i]/ss0[i];
-
-			count++;
-		}
-      ////////////////////////////
-        // psi, q, pi
-        if (ici[i] == 0) 
-		{
-			pi[i]=0;
-			for (j = 0; j < n; j++)
-				if (t2[j] >= t2[i])
-					pi[i]++;
-
-			count2 = 0;
-			for (j1 = 0; j1 < n; j1++)
-			{
-				if (ici[j1] == 1)  count2 ++;
-				if (t2[j1] < t2[i] || ici[j1] != 1) continue;
-
-				//q
-				wye = 0;
-				for (k = 0; k < np; k++)
-					wyez[k] = 0;
-				s = strata[j1];
-				
-				for (j2 = 0; j2 < n; j2++)
-				{
-					if (t2[j2] >= t2[i]) break;
-					if (ici[j2] <= 1 || strata[j2] != s) continue;
-
-					zb = 0;
-					if (n1 > 0)
-						for (j = 0; j < n1; j++)
-						{
-							z[j] = *(a+j2*n1+j);
-							zb += b[j] *(*(a+j2*n1+j));
-						}
-					if (n2 > 0)
-						for (k = 0; k < n2; k++)
-						{
-							z[n1+k]= (*(aa+j2*n2+k)) * (*(tt+(count2-1)*n2+k));
-							zb += b[n1+k] * (*(aa+j2*n2+k)) * (*(tt+(count2-1)*n2+k));
-						}
-
-					wye += exp(zb)* wt[j1] / wt[j2];
-					for (k = 0; k < np; k++)
-						wyez[k] += exp(zb)* wt[j1] / wt[j2] * z[k];
-				}
-
-				for (k = 0; k < np; k++)
-					*(q+i*np+k) += (wyez[k] - (*(ss1+j1*np+k))/ss0[j1] * wye) /ss0[j1];
-			}
-		}  
-	}
-
-  ///////////////////////////////////////////////////////////////
-    //result
-	for (i = 0; i < n; i++)
-        for (k = 0; k < np; k++)
-		{
-			if (ici[i]==0) *(eta+i*np+k) += (*(q+i*np+k))/pi[i];
-		    for (j = 0; j < n; j++)
-			{
-				    if (t2[j] > t2[i]) break;
-				    if (ici[j] == 0) *(eta+i*np+k)-= (*(q+j*np+k))/pi[j]/pi[j];
-			 }
-		}
-
-	//output information
-    for (j = 0; j < np; j++)
-        for (k= 0; k < np; k++)
-            v[j  + k * np] = *(vt+j*np+k) ;   
-
-	//output variance of the estimating equation
-	for (i = 0; i < np*np; i++)
-		v2[i] = 0;
-	for (i = 0; i < ns; i++)
-		for (j = 0; j < n; j++)
-		{
-			if (strata[j] != i+1) continue;
-			for (k = 0; k < np; k++)
-				*(xi+i*np+k)+= *(eta+j*np+k);
-		}
-	for (j = 0; j < np; j++)
-		for (k= 0; k < np; k++)
-			for (i = 0; i < ns; i++)
-				v2[j  + k * np] += (*(xi+i*np+j)) * (*(xi+i*np+k));
-
-	free(a);free(aa);free(tt);free(ss1);free(ss2);free(eta);free(q);free(vt);free(xi);
-}
-
-
-
 
 // reproduce crrf to obtain liklihood
 
-void crrf(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, int *ncov2, 
+void crrfo(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, int *ncov2, 
 		 double *ft, int *ndfin, double *wt, double *b, double *lik)
 {
     int i,j, k, j1,  count=0;
 	const int n1=ncov[0], n2=ncov2[0], n=nin[0], ndf=ndfin[0];
-	double likli=0, ss0,zb,*a,*aa,*tt;
+	double likli=0, s0,zb,*a,*aa,*tt;
 	a=(double*)malloc(n*n1*LEN);
 	aa=(double*)malloc(n*n2*LEN);
 	tt=(double*)malloc(ndf*n2*LEN);
- 
+	
 	if (n1 > 0)
         for (i = 0; i < n; i++)
             for (j = 0; j < n1; j++)
@@ -279,9 +47,9 @@ void crrf(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, int
 				likli += b[j] * (*(a+i*n1+j));
 		if (n2 > 0)
 			for (k = 0; k < n2; k++)
-				likli += b[n1+k] *(*(aa+i*n2+k))* (*(tt+count*n2+k));
+				likli += b[n1+k]  * (*(aa+i*n2+k))* (*(tt+count*n2+k));
         //second part of logliklihood
-		ss0=0;
+		s0=0;
 		for (j = 0; j < n; j++)
 		{
 			if (t2[j] < t2[i] && ici[j] <= 1) continue;
@@ -294,13 +62,13 @@ void crrf(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, int
 					zb += b[n1+k] * (*(aa+j*n2+k)) * (*(tt+count*n2+k));
 
 			if (t2[j] >= t2[i]) 
-				ss0 += exp(zb);
+				s0 += exp(zb);
 			else 
-				ss0 += exp(zb) * wt[i] / wt[j]; 
+				s0 += exp(zb) * wt[i] / wt[j]; 
 
 		}
 
-		likli -= log(ss0);
+		likli -= log(s0);
 
 	    count++;
 	}
@@ -314,17 +82,19 @@ void crrf(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, int
 
 // reproduce crrfsv to obtain liklihood, score, and information
 
-void crrfsv(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, int *ncov2, 
+void crrfsvo(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, int *ncov2, 
 		 double *ft, int *ndfin, double *wt, double *b, double *lik, double *st, double *v)
 {
     int i,j, k, j1,  count=0;
 	const int n1=ncov[0], n2=ncov2[0], n=nin[0], ndf=ndfin[0], np=n1+n2;
-	double likli=0,ss0,ss1[np],z[np],zb,wye,*a,*aa,*tt,*ss2,*vt;
+	double likli=0,s0,s1[np],z[np],zb,wye,*a,*aa,*tt,*s2,*vt;
+
 	a=(double*)malloc(n*n1*LEN);
 	aa=(double*)malloc(n*n2*LEN);
 	tt=(double*)malloc(ndf*n2*LEN);
-    ss2=(double*)malloc(np*np*LEN);
-    vt=(double*)malloc(np*np*LEN);
+	s2=(double*)malloc(np*np*LEN);
+	vt=(double*)malloc(np*np*LEN);
+
     for (i = 0; i < np; i++)
 	{
 		st[i] = 0;
@@ -357,24 +127,24 @@ void crrfsv(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, i
 			for (j = 0; j < n1; j++)
 			{
 				st[j]  +=  *(a+i*n1+j);
-				zb += b[j] *(*(a+i*n1+j));
+				zb += b[j] * (*(a+i*n1+j));
 			}
 		if (n2 > 0)
 			for (k = 0; k < n2; k++)
 			{
-				st[n1+k]  +=  (*(aa+i*n2+k)) * (*(tt+count*n2+k));
+				st[n1+k]  +=  (*(aa+i*n2+k))* (*(tt+count*n2+k));
 				zb += b[n1+k] * (*(aa+i*n2+k)) * (*(tt+count*n2+k));
 			}
 
         likli += zb;
 
         //second part of logliklihood, second part of score, and information
-		ss0 = 0;
+		s0 = 0;
 		for (k = 0; k < np; k++)
 		{
-			ss1[k] = 0;
+			s1[k] = 0;
 			for (j1 = 0; j1 < np; j1 ++)
-				*(ss2+k*np+j1) = 0;
+				*(s2+k*np+j1)= 0;
 		}
 
 		for (j = 0; j < n; j++)
@@ -395,8 +165,8 @@ void crrfsv(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, i
 			if (n2 > 0)
 				for (k = 0; k < n2; k++)
 				{
-					z[n1+k] = (*(aa+j*n2+k)) * (*(tt+count*n2+k));
-					zb += b[n1+k] * (*(aa+j*n2+k)) * (*(tt+count*n2+k));
+					z[n1+k] =  (*(aa+j*n2+k)) * (*(tt+count*n2+k));
+					zb += b[n1+k] *  (*(aa+j*n2+k)) * (*(tt+count*n2+k));
 				}
 
 
@@ -405,23 +175,23 @@ void crrfsv(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, i
 			else 
 				wye = exp(zb) * wt[i] / wt[j]; 
 
-			ss0 += wye;
+			s0 += wye;
 			for (k = 0; k < np; k++)
 			{
-				ss1[k] += wye * z[k];
+				s1[k] += wye * z[k];
 				for (j1 = 0; j1 < np; j1++)
-					*(ss2+k*np+j1) += wye * z[k] * z[j1];
+					*(s2+k*np+j1) += wye * z[k] * z[j1];
 			}
 
 		}
 
-		likli -= log(ss0);
+		likli -= log(s0);
 
 		for (k = 0; k < np; k++)
 		{
-			st[k] -= ss1[k] / ss0;
+			st[k] -= s1[k] / s0;
 			for (j1 = 0; j1 < np; j1++)
-				*(vt+k*np+j1)+= (*(ss2+k*np+j1))/ss0 - ss1[k] * ss1[j1]/ss0/ss0;
+				*(vt+k*np+j1) += (*(s2+k*np+j1))/s0 - s1[k] * s1[j1]/s0/s0;
 		}
 		
 	    count++;
@@ -433,30 +203,31 @@ void crrfsv(double *t2, int *ici, int *nin, double *x, int *ncov,  double *x2, i
 		for (j = 0; j < np; j++)
 			v[i + np * j] = *(vt+i*np+j);
 
-	free(a);free(aa);free(tt);free(ss2);free(vt);
+
+	free(a);free(aa);free(tt);free(s2);free(vt);
 }
 
 
 
 
 
-  // reproduce crrvv to obtain the variance 
+  // reproduce crrvv to obtain the variance
 
-void crrvv(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, int *ncov2,
+void crrvvo(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, int *ncov2,
          double *ft, int *ndfin, double *wt, double *b, double *v, double *v2)
 {
     const int n1=ncov[0], n2=ncov2[0], n=nin[0], ndf=ndfin[0], np=n1+n2;
 	int i,j, k, j1, j2,count=0, count1=0, count2=0, pi[n];
-    double z[np],zb, wye, wyez[np], ss0[n],*a,*aa,*tt,*ss1,*ss2,*eta,*vt,*q;
-		
+    double z[np],zb, wye, wyez[np], ss0[n],*a,*aa,*tt,*ss1,*ss2,*eta,*q,*vt;
+
 	a=(double*)malloc(n*n1*LEN);
 	aa=(double*)malloc(n*n2*LEN);
 	tt=(double*)malloc(ndf*n2*LEN);
 	ss1=(double*)malloc(n*np*LEN);
 	ss2=(double*)malloc(n*np*np*LEN);
 	eta=(double*)malloc(n*np*LEN);
-	vt=(double*)malloc(np*np*LEN);
 	q=(double*)malloc(n*np*LEN);
+	vt=(double*)malloc(np*np*LEN);
 
     // initialization
 	for (i = 0; i < n; i++)
@@ -481,7 +252,7 @@ void crrvv(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, int 
         for (j = 0; j < np; j++)
 			*(vt+i*np+j) = 0;
 
-    if (n1 > 0)
+	if (n1 > 0)
         for (i = 0; i < n; i++)
             for (j = 0; j < n1; j++)
                 *(a+i*n1+j)= x[i + n * j];
@@ -518,8 +289,8 @@ void crrvv(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, int 
             if (n2 > 0)
                 for (k = 0; k < n2; k++)
                 {
-                    z[n1+k] = (*(aa+j*n2+k))*(*(tt+count*n2+k));
-                    zb += b[n1+k] * (*(aa+j*n2+k))*(*(tt+count*n2+k));
+                    z[n1+k] = (*(aa+j*n2+k)) * (*(tt+count*n2+k));
+                    zb += b[n1+k] * (*(aa+j*n2+k)) * (*(tt+count*n2+k));
                 }
 
             if (t2[j] >= t2[i])
@@ -599,7 +370,7 @@ void crrvv(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, int 
 			if (n2 > 0)
 				for (k = 0; k < n2; k++)
 				{
-					z[n1+k]=  (*(aa+i*n2+k))*(*(tt+count*n2+k));
+					z[n1+k]= (*(aa+i*n2+k))*(*(tt+count*n2+k));
 					zb += b[n1+k] * (*(aa+i*n2+k))*(*(tt+count*n2+k));
 				}
 
@@ -609,10 +380,11 @@ void crrvv(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, int 
 			//information
 			for (j = 0; j < np; j++)
 				for (k = 0; k < np; k++)
-					*(vt+j*np+k) += (*(ss2+i*np*np+j*np+k))/ss0[i] - (*(ss1+i*np+j)) * (*(ss1+i*np+k))/ss0[i]/ss0[i];
+					*(vt+j*np+k) += (*(ss2+i*np*np+j*np+k))/ss0[i] - *(ss1+i*np+j) * (*(ss1+i*np+k))/ss0[i]/ss0[i];
 
 			count++;
 		}
+
       ////////////////////////////
         // psi, q, pi
         if (ici[i] == 0) 
@@ -643,14 +415,14 @@ void crrvv(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, int 
 					if (n1 > 0)
 						for (j = 0; j < n1; j++)
 						{
-							z[j] = *(a+j2*n1+j) ;
-							zb += b[j] * (*(a+j2*n1+j));
+							z[j] = *(a+j2*n1+j);
+							zb += b[j] *(*(a+j2*n1+j));
 						}
 					if (n2 > 0)
 						for (k = 0; k < n2; k++)
 						{
-							z[n1+k]= (*(aa+j2*n2+k))*(*(tt+(count2-1)*n2+k));
-							zb += b[n1+k] * (*(aa+j2*n2+k))*(*(tt+(count2-1)*n2+k));
+							z[n1+k]= (*(aa+j2*n2+k)) * (*(tt+(count2-1)*n2+k));
+							zb += b[n1+k] * (*(aa+j2*n2+k)) * (*(tt+(count2-1)*n2+k));
 						}
 
 					wye += exp(zb)* wt[j1] / wt[j2];
@@ -659,9 +431,9 @@ void crrvv(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, int 
 				}
 
 				for (k = 0; k < np; k++)
-					*(q+i*np+k)+= (wyez[k] - (*(ss1+j1*np+k))/ss0[j1] * wye) /ss0[j1];
+					*(q+i*np+k) += (wyez[k] - (*(ss1+j1*np+k))/ss0[j1] * wye) /ss0[j1];
 			}
-		}
+		}  
 	}
 
   ///////////////////////////////////////////////////////////////
@@ -669,7 +441,7 @@ void crrvv(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, int 
 	for (i = 0; i < n; i++)
         for (k = 0; k < np; k++)
 		{
-			if (ici[i]==0) *(eta+i*np+k)+= *(q+i*np+k)/pi[i];
+			if (ici[i]==0) *(eta+i*np+k)+= (*(q+i*np+k))/pi[i];
 		    for (j = 0; j < n; j++)
 			{
 				    if (t2[j] > t2[i]) break;
@@ -679,7 +451,7 @@ void crrvv(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, int 
 
     for (j = 0; j < np; j++)
         for (k= 0; k < np; k++)
-            v[j  + k * np] = *(vt+j*np+k) ;   
+            v[j  + k * np] = *(vt+j*np+k);   
 
 	for (i=0; i<np*np; i++)
 		v2[i]=0;
@@ -687,10 +459,11 @@ void crrvv(double *t2, int *ici, int *nin, double *x, int *ncov,double *x2, int 
     for (j = 0; j < np; j++)
         for (k= 0; k < np; k++)
 			for (i = 0; i < n; i++)
-                v2[j  + k * np] += (*(eta+i*np+j))* (*(eta+i*np+k));
-free(a);free(aa);free(tt);free(ss1);free(ss2);free(eta);free(vt);free(q);
+                v2[j  + k * np] += (*(eta+i*np+j))*(*(eta+i*np+k)) ;
+
+	free(a);free(aa);free(tt);free(vt);free(ss1);free(ss2);free(eta);free(q);
 }
 
 
-//end of the functions
 
+//end of the functions
