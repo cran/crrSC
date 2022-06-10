@@ -1,6 +1,6 @@
 useDynLib(crrSC)
 export("crrs","crrc","psh.test")
-
+  importFrom("stats", "na.omit", "pchisq", "pnorm")
 import(
   survival
 )
